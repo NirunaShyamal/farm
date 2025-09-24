@@ -469,14 +469,14 @@ const TaskScheduling = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Time</label>
                   <input
-                    type="text"
+                    type="time"
                     name="time"
                     value={formData.time}
                     onChange={handleInputChange}
-                    placeholder="HH:MM AM/PM"
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
                     required
                   />
+                  <p className="mt-1 text-xs text-gray-500">Use the time picker to select the task time</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Status</label>

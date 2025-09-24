@@ -27,6 +27,7 @@ const FinancialManagement = () => {
 
   const [showModal, setShowModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
+  const [reportPeriod, setReportPeriod] = useState('monthly');
   const [formData, setFormData] = useState({
     date: '',
     description: '',
@@ -42,8 +43,9 @@ const FinancialManagement = () => {
     notes: ''
   });
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     setEditingRecord(null);
+    const autoReference = await generateNextReferenceNumber();
     setFormData({
       date: new Date().toISOString().split('T')[0],
       description: '',
@@ -51,7 +53,7 @@ const FinancialManagement = () => {
       subcategory: '',
       amount: '',
       paymentMethod: '',
-      reference: '',
+      reference: autoReference,
       customerSupplier: '',
       location: 'Farm',
       taxAmount: 0,
@@ -111,6 +113,188 @@ const FinancialManagement = () => {
     });
   };
 
+  // Generate next reference number
+  const generateNextReferenceNumber = async () => {
+    try {
+      // Get all existing financial records to find the highest reference number
+      const data = await apiService.getFinancialRecords();
+      if (data.success && data.data.length > 0) {
+        const currentYear = new Date().getFullYear();
+        const yearPrefix = `FIN-${currentYear}-`;
+        
+        // Find the highest reference number for this year
+        const existingRefs = data.data
+          .filter(record => record.reference && record.reference.startsWith(yearPrefix))
+          .map(record => {
+            const numberPart = record.reference.replace(yearPrefix, '');
+            return parseInt(numberPart) || 0;
+          });
+        
+        const maxNumber = existingRefs.length > 0 ? Math.max(...existingRefs) : 0;
+        const nextNumber = (maxNumber + 1).toString().padStart(3, '0');
+        
+        return `${yearPrefix}${nextNumber}`;
+      } else {
+        // If no records exist, start with 001
+        const currentYear = new Date().getFullYear();
+        return `FIN-${currentYear}-001`;
+      }
+    } catch (error) {
+      console.error('Error generating reference number:', error);
+      // Fallback reference number
+      const currentYear = new Date().getFullYear();
+      return `FIN-${currentYear}-001`;
+    }
+  };
+
+  // Report generation functions
+  const generateReport = () => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+    
+    let filteredRecords = financialRecords;
+    
+    // Filter records based on period
+    if (reportPeriod === 'monthly') {
+      filteredRecords = financialRecords.filter(record => {
+        const recordDate = new Date(record.date);
+        return recordDate.getFullYear() === currentYear && recordDate.getMonth() === currentMonth;
+      });
+    } else if (reportPeriod === 'yearly') {
+      filteredRecords = financialRecords.filter(record => {
+        const recordDate = new Date(record.date);
+        return recordDate.getFullYear() === currentYear;
+      });
+    }
+    
+    const report = {
+      period: reportPeriod,
+      generatedDate: currentDate.toISOString().split('T')[0],
+      totalRecords: filteredRecords.length,
+      totalIncome: filteredRecords.filter(record => record.category === 'Income').reduce((sum, record) => sum + record.amount, 0),
+      totalExpenses: filteredRecords.filter(record => record.category === 'Expense').reduce((sum, record) => sum + record.amount, 0),
+      netProfit: 0,
+      incomeBreakdown: {},
+      expenseBreakdown: {},
+      paymentMethodBreakdown: {},
+      records: filteredRecords
+    };
+    
+    report.netProfit = report.totalIncome - report.totalExpenses;
+    
+    // Calculate breakdowns
+    filteredRecords.forEach(record => {
+      if (record.category === 'Income') {
+        report.incomeBreakdown[record.subcategory || 'Other Income'] = 
+          (report.incomeBreakdown[record.subcategory || 'Other Income'] || 0) + record.amount;
+      } else if (record.category === 'Expense') {
+        report.expenseBreakdown[record.subcategory || 'Other Expenses'] = 
+          (report.expenseBreakdown[record.subcategory || 'Other Expenses'] || 0) + record.amount;
+      }
+      
+      report.paymentMethodBreakdown[record.paymentMethod] = 
+        (report.paymentMethodBreakdown[record.paymentMethod] || 0) + record.amount;
+    });
+    
+    // Directly generate and download PDF
+    exportToPDF(report);
+  };
+
+
+  const exportToPDF = (reportData) => {
+    // Simple PDF generation using window.print() for now
+    // In a real application, you'd use a library like jsPDF or Puppeteer
+    const printWindow = window.open('', '_blank');
+    const reportHTML = generateReportHTML(reportData);
+    printWindow.document.write(reportHTML);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  const generateReportHTML = (reportData) => {
+    if (!reportData) return '';
+    
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Financial Report - ${reportData.generatedDate}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .summary { display: flex; justify-content: space-around; margin: 20px 0; }
+          .summary-item { text-align: center; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          .breakdown { margin: 20px 0; }
+          .breakdown h3 { color: #333; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Financial Report</h1>
+          <p>Generated on: ${reportData.generatedDate}</p>
+          <p>Period: ${reportData.period}</p>
+        </div>
+        
+        <div class="summary">
+          <div class="summary-item">
+            <h3>Total Income</h3>
+            <p>Rs. ${reportData.totalIncome.toLocaleString()}</p>
+          </div>
+          <div class="summary-item">
+            <h3>Total Expenses</h3>
+            <p>Rs. ${reportData.totalExpenses.toLocaleString()}</p>
+          </div>
+          <div class="summary-item">
+            <h3>Net Profit</h3>
+            <p>Rs. ${reportData.netProfit.toLocaleString()}</p>
+          </div>
+        </div>
+        
+        <div class="breakdown">
+          <h3>Income Breakdown</h3>
+          <table>
+            <tr><th>Category</th><th>Amount</th></tr>
+            ${Object.entries(reportData.incomeBreakdown).map(([category, amount]) => 
+              `<tr><td>${category}</td><td>Rs. ${amount.toLocaleString()}</td></tr>`
+            ).join('')}
+          </table>
+        </div>
+        
+        <div class="breakdown">
+          <h3>Expense Breakdown</h3>
+          <table>
+            <tr><th>Category</th><th>Amount</th></tr>
+            ${Object.entries(reportData.expenseBreakdown).map(([category, amount]) => 
+              `<tr><td>${category}</td><td>Rs. ${amount.toLocaleString()}</td></tr>`
+            ).join('')}
+          </table>
+        </div>
+        
+        <div class="breakdown">
+          <h3>All Records</h3>
+          <table>
+            <tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Payment Method</th><th>Reference</th></tr>
+            ${reportData.records.map(record => 
+              `<tr>
+                <td>${record.date}</td>
+                <td>${record.description}</td>
+                <td>${record.category}</td>
+                <td>Rs. ${record.amount.toLocaleString()}</td>
+                <td>${record.paymentMethod}</td>
+                <td>${record.reference}</td>
+              </tr>`
+            ).join('')}
+          </table>
+        </div>
+      </body>
+      </html>
+    `;
+  };
+
   // Calculate financial metrics
   const totalIncome = financialRecords
     .filter(record => record.category === 'Income')
@@ -122,12 +306,18 @@ const FinancialManagement = () => {
 
   const netProfit = totalIncome - totalExpenses;
 
+  // Calculate current month and year dynamically
+  const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+  const currentMonthPrefix = `${currentYear}-${currentMonth}`;
+
   const monthlyIncome = financialRecords
-    .filter(record => record.category === 'Income' && record.date.startsWith('2024-01'))
+    .filter(record => record.category === 'Income' && record.date.startsWith(currentMonthPrefix))
     .reduce((sum, record) => sum + record.amount, 0);
 
   const monthlyExpenses = financialRecords
-    .filter(record => record.category === 'Expense' && record.date.startsWith('2024-01'))
+    .filter(record => record.category === 'Expense' && record.date.startsWith(currentMonthPrefix))
     .reduce((sum, record) => sum + record.amount, 0);
 
   return (
@@ -303,11 +493,14 @@ const FinancialManagement = () => {
                   </svg>
                   ADD NEW RECORD
                 </button>
-                <button className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium">
-                  Generate Report
-                </button>
-                <button className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-medium">
-                  Export Data
+                <button 
+                  onClick={generateReport}
+                  className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium flex items-center"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                  Download PDF Report
                 </button>
               </div>
             </div>
@@ -493,10 +686,21 @@ const FinancialManagement = () => {
                     name="reference"
                     value={formData.reference}
                     onChange={handleInputChange}
-                    placeholder="e.g., INV-001, PO-002"
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    placeholder="e.g., FIN-2025-001"
+                    className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
+                      !editingRecord ? 'bg-gray-50 cursor-not-allowed' : ''
+                    }`}
+                    readOnly={!editingRecord}
                     required
                   />
+                  {!editingRecord && (
+                    <p className="mt-1 text-xs text-gray-500 flex items-center">
+                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Auto-generated reference number
+                    </p>
+                  )}
                 </div>
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
@@ -518,6 +722,7 @@ const FinancialManagement = () => {
           </div>
         </div>
       )}
+
 
       {/* Footer */}
       <footer className="bg-white border-t mt-12">

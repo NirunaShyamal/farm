@@ -148,26 +148,26 @@ const FeedInventory = () => {
           month: new Date().toISOString().slice(0, 7),
           year: new Date().getFullYear(),
           baselineQuantity: '',
-          supplier: '',
-          supplierContact: '',
-          costPerUnit: '',
-          minimumThreshold: 100,
+      supplier: '',
+      supplierContact: '',
+      costPerUnit: '',
+      minimumThreshold: 100,
           expiryDate: (() => {
             const date = new Date();
             date.setMonth(date.getMonth() + 6);
             return date.toISOString().split('T')[0];
           })(),
-          location: 'Main Storage',
+      location: 'Main Storage',
           batchNumber: '',
           deliveryDate: '',
           qualityGrade: 'A',
-          notes: ''
-        });
+      notes: ''
+    });
       } else {
         console.error('❌ Stock submission failed:', data.message); // Debug log
         alert(data.message || 'Error updating stock');
-      }
-    } catch (error) {
+        }
+      } catch (error) {
       console.error('Error submitting stock:', error);
       alert('Error submitting stock data');
     }
@@ -183,14 +183,14 @@ const FeedInventory = () => {
         body: JSON.stringify(usageForm)
       });
       const data = await response.json();
-      if (data.success) {
+        if (data.success) {
         setShowUsageModal(false);
         fetchDashboardData();
         fetchFeedUsage();
         alert('Feed usage recorded successfully!');
       } else {
         alert(data.message || 'Error recording usage');
-      }
+        }
     } catch (error) {
       console.error('Error submitting usage:', error);
       alert('Error submitting usage data');
@@ -320,7 +320,7 @@ const FeedInventory = () => {
                 </svg>
               </div>
                   <h1 className="text-3xl font-bold text-gray-900">Advanced Feed Management</h1>
-                </div>
+            </div>
                 <p className="text-gray-600">Smart feed inventory with usage tracking and analytics</p>
           </div>
 
@@ -352,9 +352,9 @@ const FeedInventory = () => {
                   </svg>
                   Health Log
                 </button>
+                </div>
               </div>
             </div>
-          </div>
 
           {/* Tab Navigation */}
           <div className="mb-6">
@@ -382,7 +382,7 @@ const FeedInventory = () => {
                 </button>
               ))}
             </nav>
-          </div>
+                </div>
 
           {/* Dashboard Tab */}
           {activeTab === 'dashboard' && (
@@ -405,7 +405,7 @@ const FeedInventory = () => {
                     {formatCurrency(dashboardData.summary?.totalValue || 0)}
                   </p>
                   <p className="text-sm text-gray-600 mt-1">Current inventory value</p>
-            </div>
+              </div>
 
                 <div className="bg-white rounded-lg shadow-md p-6">
                   <h3 className="text-sm font-medium text-gray-500 mb-2">Daily Consumption</h3>
@@ -431,7 +431,7 @@ const FeedInventory = () => {
                   <h3 className="text-lg font-semibold text-red-600 mb-4 flex items-center">
                     <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
+                  </svg>
                     Low Stock ({dashboardData.summary?.lowStockItems || 0})
                   </h3>
                   <div className="space-y-2">
@@ -439,10 +439,10 @@ const FeedInventory = () => {
                       <div key={index} className="flex justify-between items-center p-2 bg-red-50 rounded">
                         <span className="text-sm font-medium">{item.feedType}</span>
                         <span className="text-sm text-red-600">{item.currentQuantity} KG</span>
-                      </div>
-                    ))}
-                  </div>
                 </div>
+                    ))}
+              </div>
+            </div>
 
                 {/* Critical Stock Alerts */}
                 <div className="bg-white rounded-lg shadow-md p-6">
@@ -457,7 +457,7 @@ const FeedInventory = () => {
                       <div key={index} className="flex justify-between items-center p-2 bg-red-100 rounded">
                         <span className="text-sm font-medium">{item.feedType}</span>
                         <span className="text-sm text-red-800 font-bold">{item.currentQuantity} KG</span>
-                      </div>
+                </div>
                     ))}
                   </div>
                 </div>
@@ -467,7 +467,7 @@ const FeedInventory = () => {
                   <h3 className="text-lg font-semibold text-yellow-600 mb-4 flex items-center">
                     <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                    </svg>
+                  </svg>
                     Expiring Soon ({dashboardData.summary?.expiringItems || 0})
                   </h3>
                   <div className="space-y-2">
@@ -475,11 +475,11 @@ const FeedInventory = () => {
                       <div key={index} className="flex justify-between items-center p-2 bg-yellow-50 rounded">
                         <span className="text-sm font-medium">{item.feedType}</span>
                         <span className="text-sm text-yellow-600">{item.expiryDate}</span>
-                      </div>
-                    ))}
-                  </div>
                 </div>
+                    ))}
               </div>
+            </div>
+          </div>
 
               {/* Inventory by Type */}
               <div className="bg-white rounded-lg shadow-md p-6">
@@ -490,12 +490,12 @@ const FeedInventory = () => {
                       <div className="flex justify-between items-center mb-2">
                         <h4 className="font-medium text-gray-900">{item.feedType}</h4>
                         <span className="text-sm text-gray-500">{item.percentage}%</span>
-                      </div>
+              </div>
                       <div className="space-y-1">
                         <div className="flex justify-between text-sm">
                           <span>Quantity:</span>
                           <span className="font-medium">{item.quantity} KG</span>
-                        </div>
+            </div>
                         <div className="flex justify-between text-sm">
                           <span>Value:</span>
                           <span className="font-medium">{formatCurrency(item.value)}</span>
@@ -545,7 +545,7 @@ const FeedInventory = () => {
                             <div className="flex items-center">
                               <div className="text-sm font-medium text-gray-900">{stock.feedType}</div>
                             </div>
-                          </td>
+                      </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm">
                               <span className={`font-semibold ${getStockLevelColor(stock.currentQuantity, stock.minimumThreshold)}`}>
@@ -555,13 +555,13 @@ const FeedInventory = () => {
                                 Threshold: {stock.minimumThreshold} KG
                               </div>
                             </div>
-                          </td>
+                      </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`text-sm font-medium ${getDaysRemainingColor(stock.daysUntilExpiry || 0)}`}>
                               {stock.daysUntilExpiry || 0} days
                             </span>
                       </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {stock.supplier}
                       </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -579,13 +579,13 @@ const FeedInventory = () => {
                             >
                               View Details
                             </button>
-                          </td>
-                        </tr>
+                        </td>
+                      </tr>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                </tbody>
+              </table>
+            </div>
+          </div>
                           </div>
           )}
 
@@ -639,9 +639,9 @@ const FeedInventory = () => {
                       ))}
                 </tbody>
               </table>
-            </div>
-          </div>
-            </div>
+                    </div>
+                  </div>
+                </div>
           )}
 
           {/* Analytics Tab */}
@@ -679,9 +679,9 @@ const FeedInventory = () => {
                 <div className="text-center py-8">
                   <p className="text-gray-500">📈 Advanced analytics charts and insights coming soon...</p>
                   <p className="text-sm text-gray-400 mt-2">Consumption trends, efficiency metrics, and predictive analytics</p>
-                </div>
               </div>
             </div>
+          </div>
           )}
         </main>
       </div>
@@ -850,8 +850,8 @@ const FeedInventory = () => {
               <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
                 <p className="text-sm text-blue-700">
                   📝 <strong>Quick Daily Recording</strong> - Only essential fields for everyday use
-                </p>
-              </div>
+                  </p>
+                </div>
 
               <form onSubmit={handleUsageSubmit} className="space-y-4">
                 <div>
