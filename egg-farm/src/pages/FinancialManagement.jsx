@@ -1,15 +1,29 @@
 import { Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import apiService from '../services/api';
 
 const FinancialManagement = () => {
-  const [financialRecords, setFinancialRecords] = useState([
-    { id: 1, date: '2024-01-15', description: 'Egg Sales Revenue', category: 'Income', amount: 45000, paymentMethod: 'Cash', reference: 'INV-001' },
-    { id: 2, date: '2024-01-14', description: 'Feed Purchase', category: 'Expense', amount: 12000, paymentMethod: 'Bank Transfer', reference: 'PO-002' },
-    { id: 3, date: '2024-01-13', description: 'Equipment Maintenance', category: 'Expense', amount: 3500, paymentMethod: 'Cheque', reference: 'MAINT-003' },
-    { id: 4, date: '2024-01-12', description: 'Chick Purchase', category: 'Expense', amount: 8000, paymentMethod: 'Bank Transfer', reference: 'CHICK-004' },
-    { id: 5, date: '2024-01-11', description: 'Egg Sales Revenue', category: 'Income', amount: 38000, paymentMethod: 'Cash', reference: 'INV-005' },
-    { id: 6, date: '2024-01-10', description: 'Veterinary Services', category: 'Expense', amount: 2500, paymentMethod: 'Cash', reference: 'VET-006' },
-  ]);
+  const [financialRecords, setFinancialRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Load data from backend
+  useEffect(() => {
+    fetchFinancialRecords();
+  }, []);
+
+  const fetchFinancialRecords = async () => {
+    try {
+      setLoading(true);
+      const data = await apiService.getFinancialRecords();
+      if (data.success) {
+        setFinancialRecords(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching financial records:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [showModal, setShowModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
@@ -17,14 +31,33 @@ const FinancialManagement = () => {
     date: '',
     description: '',
     category: '',
+    subcategory: '',
     amount: '',
     paymentMethod: '',
-    reference: ''
+    reference: '',
+    customerSupplier: '',
+    location: 'Farm',
+    taxAmount: 0,
+    status: 'Completed',
+    notes: ''
   });
 
   const handleCreate = () => {
     setEditingRecord(null);
-    setFormData({ date: '', description: '', category: '', amount: '', paymentMethod: '', reference: '' });
+    setFormData({
+      date: new Date().toISOString().split('T')[0],
+      description: '',
+      category: '',
+      subcategory: '',
+      amount: '',
+      paymentMethod: '',
+      reference: '',
+      customerSupplier: '',
+      location: 'Farm',
+      taxAmount: 0,
+      status: 'Completed',
+      notes: ''
+    });
     setShowModal(true);
   };
 
@@ -34,29 +67,41 @@ const FinancialManagement = () => {
     setShowModal(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this financial record?')) {
-      setFinancialRecords(financialRecords.filter(record => record.id !== id));
+      try {
+        const data = await apiService.deleteFinancialRecord(id);
+        if (data.success) {
+          await fetchFinancialRecords(); // Refresh data
+        }
+      } catch (error) {
+        console.error('Error deleting financial record:', error);
+        alert('Error deleting financial record: ' + error.message);
+      }
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editingRecord) {
-      setFinancialRecords(financialRecords.map(record => 
-        record.id === editingRecord.id 
-          ? { ...formData, id: editingRecord.id, amount: parseFloat(formData.amount) }
-          : record
-      ));
-    } else {
-      const newRecord = {
-        ...formData,
-        id: financialRecords.length + 1,
-        amount: parseFloat(formData.amount)
-      };
-      setFinancialRecords([...financialRecords, newRecord]);
+    try {
+      if (editingRecord) {
+        // Update existing record
+        const data = await apiService.updateFinancialRecord(editingRecord._id, formData);
+        if (data.success) {
+          await fetchFinancialRecords(); // Refresh data
+        }
+      } else {
+        // Create new record
+        const data = await apiService.createFinancialRecord(formData);
+        if (data.success) {
+          await fetchFinancialRecords(); // Refresh data
+        }
+      }
+      setShowModal(false);
+    } catch (error) {
+      console.error('Error saving financial record:', error);
+      alert('Error saving financial record: ' + error.message);
     }
-    setShowModal(false);
   };
 
   const handleInputChange = (e) => {
@@ -282,48 +327,62 @@ const FinancialManagement = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {financialRecords.map((record) => (
-                    <tr key={record.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.date}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{record.description}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          record.category === 'Income' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {record.category}
-                        </span>
-                      </td>
-                      <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${
-                        record.category === 'Income' ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        Rs. {record.amount.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.paymentMethod}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.reference}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <button 
-                            onClick={() => handleEdit(record)}
-                            className="text-blue-600 hover:text-blue-900"
-                            title="Edit Record"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(record.id)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Delete Record"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
+                  {loading ? (
+                    <tr>
+                      <td colSpan="7" className="px-6 py-4 text-center text-gray-500">
+                        Loading...
                       </td>
                     </tr>
-                  ))}
+                  ) : financialRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="px-6 py-4 text-center text-gray-500">
+                        No financial records found
+                      </td>
+                    </tr>
+                  ) : (
+                    financialRecords.map((record) => (
+                      <tr key={record._id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.date}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{record.description}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            record.category === 'Income' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {record.category}
+                          </span>
+                        </td>
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${
+                          record.category === 'Income' ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          Rs. {record.amount?.toLocaleString() || '0'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.paymentMethod}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.reference}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-2">
+                            <button 
+                              onClick={() => handleEdit(record)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Edit Record"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button 
+                              onClick={() => handleDelete(record._id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Delete Record"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -374,6 +433,28 @@ const FinancialManagement = () => {
                     <option value="">Select Category</option>
                     <option value="Income">Income</option>
                     <option value="Expense">Expense</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Subcategory (Optional)</label>
+                  <select
+                    name="subcategory"
+                    value={formData.subcategory}
+                    onChange={handleInputChange}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="">Select Subcategory</option>
+                    <option value="Egg Sales">Egg Sales</option>
+                    <option value="Chick Sales">Chick Sales</option>
+                    <option value="Equipment Rental">Equipment Rental</option>
+                    <option value="Government Subsidies">Government Subsidies</option>
+                    <option value="Other Income">Other Income</option>
+                    <option value="Feed & Nutrition">Feed & Nutrition</option>
+                    <option value="Veterinary Services">Veterinary Services</option>
+                    <option value="Equipment & Maintenance">Equipment & Maintenance</option>
+                    <option value="Labor Costs">Labor Costs</option>
+                    <option value="Utilities & Overhead">Utilities & Overhead</option>
+                    <option value="Other Expenses">Other Expenses</option>
                   </select>
                 </div>
                 <div>

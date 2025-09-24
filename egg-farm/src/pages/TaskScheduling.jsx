@@ -1,14 +1,29 @@
 import { Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import apiService from '../services/api';
 
 const TaskScheduling = () => {
-  const [tasks, setTasks] = useState([
-    { id: 1, date: '12/08/25', taskDescription: 'Morning Egg Collection', category: 'Egg Collection', assignedTo: 'Anusha Silva', time: '07:00 AM', status: 'Pending' },
-    { id: 2, date: '10/08/25', taskDescription: 'Feed Distribution', category: 'Feed Management', assignedTo: 'Chaminda Fernando', time: '08:00 AM', status: 'In Progress' },
-    { id: 3, date: '15/08/25', taskDescription: 'Inventory Check', category: 'Inventory', assignedTo: 'Ruwan Jayasuriya', time: '10:00 AM', status: 'Completed' },
-    { id: 4, date: '13/08/25', taskDescription: 'Vaccination Check - Flock A', category: 'Bird Care', assignedTo: 'Priya Perera', time: '09:00 AM', status: 'Pending' },
-    { id: 5, date: '14/08/25', taskDescription: 'Coop Disinfection - Batch B003', category: 'Cleaning & Maintenance', assignedTo: 'Saman Kumara', time: '06:00 AM', status: 'In Progress' },
-  ]);
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Load data from backend
+  useEffect(() => {
+    fetchTasks();
+  }, []);
+
+  const fetchTasks = async () => {
+    try {
+      setLoading(true);
+      const data = await apiService.getTasks();
+      if (data.success) {
+        setTasks(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
@@ -17,13 +32,34 @@ const TaskScheduling = () => {
     taskDescription: '',
     category: '',
     assignedTo: '',
+    assignedToContact: '',
     time: '',
-    status: 'Pending'
+    estimatedDuration: 60,
+    status: 'Pending',
+    priority: 'Medium',
+    location: 'Farm',
+    equipment: [],
+    notes: '',
+    isRecurring: false
   });
 
   const handleCreate = () => {
     setEditingTask(null);
-    setFormData({ date: '', taskDescription: '', category: '', assignedTo: '', time: '', status: 'Pending' });
+    setFormData({
+      date: new Date().toISOString().split('T')[0],
+      taskDescription: '',
+      category: '',
+      assignedTo: '',
+      assignedToContact: '',
+      time: '',
+      estimatedDuration: 60,
+      status: 'Pending',
+      priority: 'Medium',
+      location: 'Farm',
+      equipment: [],
+      notes: '',
+      isRecurring: false
+    });
     setShowModal(true);
   };
 
@@ -33,30 +69,41 @@ const TaskScheduling = () => {
     setShowModal(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this task?')) {
-      setTasks(tasks.filter(task => task.id !== id));
+      try {
+        const data = await apiService.deleteTask(id);
+        if (data.success) {
+          await fetchTasks(); // Refresh data
+        }
+      } catch (error) {
+        console.error('Error deleting task:', error);
+        alert('Error deleting task: ' + error.message);
+      }
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editingTask) {
-      // Update existing task
-      setTasks(tasks.map(task => 
-        task.id === editingTask.id 
-          ? { ...formData, id: editingTask.id }
-          : task
-      ));
-    } else {
-      // Create new task
-      const newTask = {
-        ...formData,
-        id: tasks.length + 1
-      };
-      setTasks([...tasks, newTask]);
+    try {
+      if (editingTask) {
+        // Update existing task
+        const data = await apiService.updateTask(editingTask._id, formData);
+        if (data.success) {
+          await fetchTasks(); // Refresh data
+        }
+      } else {
+        // Create new task
+        const data = await apiService.createTask(formData);
+        if (data.success) {
+          await fetchTasks(); // Refresh data
+        }
+      }
+      setShowModal(false);
+    } catch (error) {
+      console.error('Error saving task:', error);
+      alert('Error saving task: ' + error.message);
     }
-    setShowModal(false);
   };
 
   const handleInputChange = (e) => {
@@ -297,46 +344,61 @@ const TaskScheduling = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {tasks.map((task) => (
-                    <tr key={task.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.date}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{task.taskDescription}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.category}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.assignedTo}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.time}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          task.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                          task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                          'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {task.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <button 
-                            onClick={() => handleEdit(task)}
-                            className="text-blue-600 hover:text-blue-900"
-                            title="Edit Task"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(task.id)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Delete Task"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
+                  {loading ? (
+                    <tr>
+                      <td colSpan="7" className="px-6 py-4 text-center text-gray-500">
+                        Loading...
                       </td>
                     </tr>
-                  ))}
+                  ) : tasks.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="px-6 py-4 text-center text-gray-500">
+                        No tasks found
+                      </td>
+                    </tr>
+                  ) : (
+                    tasks.map((task) => (
+                      <tr key={task._id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.date}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{task.taskDescription}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.category}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.assignedTo}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.time}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            task.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                            task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                            task.status === 'Overdue' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {task.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-2">
+                            <button 
+                              onClick={() => handleEdit(task)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Edit Task"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button 
+                              onClick={() => handleDelete(task._id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Delete Task"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

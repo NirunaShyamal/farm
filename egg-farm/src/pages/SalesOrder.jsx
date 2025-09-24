@@ -1,26 +1,91 @@
 import { Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const SalesOrder = () => {
-  const [orders, setOrders] = useState([
-    { id: 1, customer: 'John Smith', product: 'Fresh Eggs', quantity: 50, price: 250.00, status: 'Pending', date: '2024-01-15' },
-    { id: 2, customer: 'Mary Johnson', product: 'Organic Eggs', quantity: 30, price: 180.00, status: 'Completed', date: '2024-01-14' },
-    { id: 3, customer: 'David Brown', product: 'Free Range Eggs', quantity: 75, price: 375.00, status: 'Processing', date: '2024-01-13' },
-  ]);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // API Base URL
+  const API_BASE_URL = 'http://localhost:5000/api';
+
+  // Load data from backend
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/sales-orders`);
+      const data = await response.json();
+      if (data.success) {
+        setOrders(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Generate next order number
+  const generateNextOrderNumber = () => {
+    const currentYear = new Date().getFullYear();
+    
+    if (orders.length === 0) {
+      return `SO-${currentYear}-001`;
+    }
+    
+    // Extract order numbers for current year and find the highest
+    const currentYearPrefix = `SO-${currentYear}-`;
+    const orderNumbers = orders
+      .map(order => order.orderNumber)
+      .filter(orderNum => orderNum && orderNum.startsWith(currentYearPrefix))
+      .map(orderNum => {
+        const parts = orderNum.split('-');
+        const num = parts[2]; // Get the number part after SO-YYYY-
+        return parseInt(num, 10) || 0;
+      });
+    
+    const maxOrder = Math.max(...orderNumbers, 0);
+    const nextOrder = maxOrder + 1;
+    return `SO-${currentYear}-${nextOrder.toString().padStart(3, '0')}`;
+  };
 
   const [showModal, setShowModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState(null);
   const [formData, setFormData] = useState({
-    customer: '',
-    product: '',
+    orderNumber: '',
+    customerName: '',
+    customerPhone: '',
+    customerEmail: '',
+    productType: '',
     quantity: '',
-    price: '',
-    status: 'Pending'
+    unitPrice: '',
+    orderDate: '',
+    deliveryDate: '',
+    status: 'Pending',
+    paymentStatus: 'Pending',
+    notes: ''
   });
 
   const handleCreate = () => {
     setEditingOrder(null);
-    setFormData({ customer: '', product: '', quantity: '', price: '', status: 'Pending' });
+    const nextOrderNumber = generateNextOrderNumber();
+    setFormData({
+      orderNumber: nextOrderNumber,
+      customerName: '',
+      customerPhone: '',
+      customerEmail: '',
+      productType: '',
+      quantity: '',
+      unitPrice: '',
+      orderDate: new Date().toISOString().split('T')[0],
+      deliveryDate: '',
+      status: 'Pending',
+      paymentStatus: 'Pending',
+      notes: ''
+    });
     setShowModal(true);
   };
 
@@ -30,31 +95,56 @@ const SalesOrder = () => {
     setShowModal(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this order?')) {
-      setOrders(orders.filter(order => order.id !== id));
+      try {
+        const response = await fetch(`${API_BASE_URL}/sales-orders/${id}`, {
+          method: 'DELETE',
+        });
+        const data = await response.json();
+        if (data.success) {
+          await fetchOrders(); // Refresh data
+        }
+      } catch (error) {
+        console.error('Error deleting order:', error);
+      }
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editingOrder) {
-      // Update existing order
-      setOrders(orders.map(order => 
-        order.id === editingOrder.id 
-          ? { ...formData, id: editingOrder.id, date: editingOrder.date }
-          : order
-      ));
-    } else {
-      // Create new order
-      const newOrder = {
-        ...formData,
-        id: orders.length + 1,
-        date: new Date().toISOString().split('T')[0]
-      };
-      setOrders([...orders, newOrder]);
+    try {
+      if (editingOrder) {
+        // Update existing order
+        const response = await fetch(`${API_BASE_URL}/sales-orders/${editingOrder._id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        });
+        const data = await response.json();
+        if (data.success) {
+          await fetchOrders(); // Refresh data
+        }
+      } else {
+        // Create new order
+        const response = await fetch(`${API_BASE_URL}/sales-orders`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        });
+        const data = await response.json();
+        if (data.success) {
+          await fetchOrders(); // Refresh data
+        }
+      }
+      setShowModal(false);
+    } catch (error) {
+      console.error('Error saving order:', error);
     }
-    setShowModal(false);
   };
 
   const handleInputChange = (e) => {
@@ -205,47 +295,62 @@ const SalesOrder = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {orders.map((order) => (
-                    <tr key={order.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">#{order.id}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.customer}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.product}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.quantity}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${order.price.toFixed(2)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          order.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                          order.status === 'Processing' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {order.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.date}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <button 
-                            onClick={() => handleEdit(order)}
-                            className="text-blue-600 hover:text-blue-900"
-                            title="Edit Order"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(order.id)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Delete Order"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
+                  {loading ? (
+                    <tr>
+                      <td colSpan="8" className="px-6 py-4 text-center text-gray-500">
+                        Loading...
                       </td>
                     </tr>
-                  ))}
+                  ) : orders.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="px-6 py-4 text-center text-gray-500">
+                        No orders found
+                      </td>
+                    </tr>
+                  ) : (
+                    orders.map((order) => (
+                      <tr key={order._id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.orderNumber}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.customerName}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.productType}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.quantity}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${order.totalAmount?.toFixed(2) || '0.00'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            order.status === 'Delivered' ? 'bg-green-100 text-green-800' :
+                            order.status === 'Processing' ? 'bg-yellow-100 text-yellow-800' :
+                            order.status === 'Ready' ? 'bg-blue-100 text-blue-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {order.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.orderDate}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-2">
+                            <button 
+                              onClick={() => handleEdit(order)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Edit Order"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button 
+                              onClick={() => handleDelete(order._id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Delete Order"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -294,29 +399,67 @@ const SalesOrder = () => {
               </h3>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Customer</label>
+                  <label className="block text-sm font-medium text-gray-700">Order Number</label>
+                  {editingOrder ? (
+                    <input
+                      type="text"
+                      name="orderNumber"
+                      value={formData.orderNumber}
+                      onChange={handleInputChange}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+                      required
+                    />
+                  ) : (
+                    <div className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-md shadow-sm bg-gray-50 text-gray-700">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-orange-600">{formData.orderNumber}</span>
+                        <span className="text-xs text-gray-500 bg-green-100 px-2 py-1 rounded-full">
+                          Auto-generated
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Order numbers are automatically generated in sequence
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Customer Name</label>
                   <input
                     type="text"
-                    name="customer"
-                    value={formData.customer}
+                    name="customerName"
+                    value={formData.customerName}
                     onChange={handleInputChange}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Product</label>
+                  <label className="block text-sm font-medium text-gray-700">Customer Phone</label>
+                  <input
+                    type="text"
+                    name="customerPhone"
+                    value={formData.customerPhone}
+                    onChange={handleInputChange}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Product Type</label>
                   <select
-                    name="product"
-                    value={formData.product}
+                    name="productType"
+                    value={formData.productType}
                     onChange={handleInputChange}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
                     required
                   >
                     <option value="">Select Product</option>
-                    <option value="Fresh Eggs">Fresh Eggs</option>
-                    <option value="Organic Eggs">Organic Eggs</option>
-                    <option value="Free Range Eggs">Free Range Eggs</option>
+                    <option value="Small Eggs">Small Eggs</option>
+                    <option value="Medium Eggs">Medium Eggs</option>
+                    <option value="Large Eggs">Large Eggs</option>
+                    <option value="Extra Large Eggs">Extra Large Eggs</option>
+                    <option value="Mixed Size">Mixed Size</option>
                   </select>
                 </div>
                 <div>
@@ -331,12 +474,23 @@ const SalesOrder = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Price</label>
+                  <label className="block text-sm font-medium text-gray-700">Unit Price</label>
                   <input
                     type="number"
                     step="0.01"
-                    name="price"
-                    value={formData.price}
+                    name="unitPrice"
+                    value={formData.unitPrice}
+                    onChange={handleInputChange}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Order Date</label>
+                  <input
+                    type="date"
+                    name="orderDate"
+                    value={formData.orderDate}
                     onChange={handleInputChange}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
                     required
@@ -352,7 +506,9 @@ const SalesOrder = () => {
                   >
                     <option value="Pending">Pending</option>
                     <option value="Processing">Processing</option>
-                    <option value="Completed">Completed</option>
+                    <option value="Ready">Ready</option>
+                    <option value="Delivered">Delivered</option>
+                    <option value="Cancelled">Cancelled</option>
                   </select>
                 </div>
                 <div className="flex justify-end space-x-3 pt-4">
